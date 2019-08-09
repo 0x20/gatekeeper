@@ -7,9 +7,12 @@ import threading
 import io
 import queue
 import traceback
+from datetime import datetime
 
 import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BCM)
+
+db_filename = None
 
 # Configuration
 GPIO_RPI_OK = 22
@@ -22,9 +25,46 @@ GPIO_GSM_RST = 18
 
 event_queue = queue.SimpleQueue()
 
+class Filter:
+    def match(self, time, number):
+        """Return whether this filter matches the incoming request"""
+        return False
+    def label(self):
+        """Return the label for this request, or None if no label"""
+        return None
+
+class TimeFilter(Filter):
+    def __init__(self, start, end):
+        """Start and end are minutes from midnight on sunday. This always repeats weekly"""
+        self.start = start
+        self.end = end
+        
+    def match(self, time, number):
+        now = time.weekday()
+        now = now * 24 + time.hour
+        now = now * 60 + time.minute
+        
+        if self.start > self.end:
+            return now >= self.start or now <= self.end
+        else:
+            return now >= self.start and now <= self.end
+
+class NumberFilter(Filter):
+    def __init__(self, number, label):
+        self.label_ = label
+        self.number = number
+
+    def match(self, time, number):
+        return number == self.number
+
+    def label(self):
+        return self.label_
+
+
 class Sim800Thread(threading.Thread):
     def __init__(self, *, name="SIM800", device="/dev/ttyAMA0"):
         super().__init__(name=name)
+        self.daemon = True
         self.device_name = device
         self.raw_device = serial.Serial(
             port = self.device_name,
@@ -87,13 +127,30 @@ class Sim800Thread(threading.Thread):
 class TickThread(threading.Thread):
     def __init__(self, rate=0.1):
         super().__init__(name="Tick")
+        self.daemon = True
         self.rate = rate
 
     def run(self):
         while True:
             time.sleep(self.rate)
             event_queue.put(("HEARTBEAT", []))
-    
+
+class OpenerThread(threading.Thread):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.daemon = True
+        self.semaphore = threading.Semaphore(value=0)
+
+    def run(self):
+        while True:
+            self.semaphore.acquire()
+            logger.info("Opening")
+            GPIO.output(GPIO_OPEN, True)
+            time.sleep(1)
+            GPIO.output(GPIO_OPEN, False)
+
+opener = OpenerThread(name="Opener")
+
 def init():
     global cached_db
     cached_db = load_database()
@@ -117,6 +174,7 @@ def init():
 
     # Start timer
     TickThread().start()
+    opener.start()
     
 class Heartbeat:
     PAT_HEARTBEAT = [
@@ -239,10 +297,46 @@ def handle_ring(number):
         cached_db = db
 
     # TODO: fill this in
+    now = datetime.now()
+    accept = False
+    label = None
+    for filt in db:
+        if filt.match(now, number):
+            accept = True
+            if label == None:
+                label = filt.label()
+    if accept:
+        # Open door
+        logger.info("Door opened for: %s", label)
+        opener.semaphore.release()
+        # TODO: Publish on MQTT
+        
+    
     
 def load_database():
     # TODO: fill this in
-    pass
+    with open(db_filename, "rt") as f:
+        filters = []
+        for rawline in f:
+            line = rawline.strip().split('#')[0].split()
+            
+            if line[0] == "*":
+                # Date pattern
+                daystart = int(line[1]) * 60 * 24
+                stime = parse_time(line[2]) + daystart
+                etime = parse_time(line[3]) + daystart
+                filters.append(TimeFilter(stime, etime))
+            elif line[0].startswith("+"):
+                num = line[0][1:]
+                if len(line) > 1:
+                    label = " ".join(line[1:])
+                else:
+                    label = None
+                filters.append(NumberFilter(num, label))
+            else:
+                logger.warning("DB: Don't know what to do with line %r", rawline)
+            
+        return filters
     
 def configure_log(use_journald, verbosity):
     global logger
@@ -271,7 +365,10 @@ def configure_log(use_journald, verbosity):
 @click.command()
 @click.option("--journald/--no-journald", default=False)
 @click.option("-v", '--verbose', count=True)
-def main(journald, verbose):
+@click.option("-d", "--database")
+def main(journald, verbose, database):
+    global db_filename
+    db_filename = database
     configure_log(journald, verbose)
     init()
     loop()
