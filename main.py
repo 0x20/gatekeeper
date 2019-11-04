@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import serial
 import click
 import re
@@ -7,11 +8,13 @@ import threading
 import io
 import queue
 import traceback
+import paho.mqtt.client as mqtt
 from datetime import datetime
 
 import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BCM)
 
+mqtt_client = mqtt.Client()
 db_filename = None
 
 # Configuration
@@ -96,7 +99,8 @@ class Sim800Thread(threading.Thread):
         # Wait until the device is done booting
         time.sleep(5)
         self.raw_device.timeout = 10
-        self.device.write(b"ATQ0V1E1+CREG=1;+CLIP=1;+CPIN=1111\n")
+        #self.device.write(b"ATQ0V1E1+CREG=1;+CLIP=1;+CPIN=1111\n")
+        self.device.write(b"ATQ0V1E1+CREG=1;+CLIP=1\n")
         logger.info("GSM initialized")
         # It's a PITA to analyze the results, so just drop into the wait loop
         while True:
@@ -281,6 +285,7 @@ def loop():
 
 def handle_ring(number):
     global cached_db
+    #mqtt.publish("gatekeeper/ring", number)
     logger.info("Received call from %s", number)
     try:
         number = number.decode("ascii")
@@ -307,6 +312,8 @@ def handle_ring(number):
                 label = filt.label()
     if accept:
         # Open door
+        #mqtt.publish("gatekeeper/open", label or "anon")
+        mqtt
         logger.info("Door opened for: %s", label)
         opener.semaphore.release()
         # TODO: Publish on MQTT
@@ -320,7 +327,9 @@ def load_database():
         for rawline in f:
             line = rawline.strip().split('#')[0].split()
             
-            if line[0] == "*":
+            if len(line) == 0:
+                continue
+            elif line[0] == "*":
                 # Date pattern
                 daystart = int(line[1]) * 60 * 24
                 stime = parse_time(line[2]) + daystart
@@ -366,10 +375,15 @@ def configure_log(use_journald, verbosity):
 @click.option("--journald/--no-journald", default=False)
 @click.option("-v", '--verbose', count=True)
 @click.option("-d", "--database")
-def main(journald, verbose, database):
+@click.option("-m", "--mqtt")
+def main(journald, verbose, database, mqtt):
     global db_filename
     db_filename = database
     configure_log(journald, verbose)
+    if mqtt:
+        mqtt_client.connect(mqtt)
+        mqtt.loop_start()
+    
     init()
     loop()
     
