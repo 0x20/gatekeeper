@@ -1,0 +1,4 @@
+serial
+click ==7
+RPi.GPIO
+paho-mqtt
