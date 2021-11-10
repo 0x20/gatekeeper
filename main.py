@@ -321,7 +321,7 @@ def handle_ring(number):
 def handle_mqtt_cmd(client, userdata, msg):
     logger.info("Received MQTT command '%s' on topic '%s'", str(msg.payload), msg.topic)
     if msg.topic == 'hsg/gatekeeper/cmd':
-        if lower(msg.payload) == 'open':
+        if lower(msg.payload.decode("utf-8") ) == 'open':
             logger.info('Opening gate from MQTT command')
             mqtt_client.publish("hsg/gatekeeper/open", "mqtt")
             opener.semaphore.release()
