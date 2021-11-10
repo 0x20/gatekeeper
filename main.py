@@ -424,7 +424,7 @@ def main(journald, verbose, database, mqtt, web):
         mqtt_client.on_message = handle_mqtt_cmd
         mqtt_client.loop_start()
     if web:
-        WebGatekeeper().start()
+        WebGatekeeperThread().start()
 
     init()
     loop()
