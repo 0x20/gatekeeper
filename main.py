@@ -387,7 +387,7 @@ def configure_log(use_journald, verbosity):
 @click.command()
 @click.option("--journald/--no-journald", default=False)
 @click.option("-v", '--verbose', count=True)
-@click.option("-d", "--database")
+@click.option("-d", "--database", required=True)
 @click.option("-m", "--mqtt")
 def main(journald, verbose, database, mqtt):
     global db_filename
