@@ -397,7 +397,7 @@ def main(journald, verbose, database, mqtt):
         mqtt_client.connect(mqtt)
         mqtt_client.on_connect = handle_mqtt_connect
         mqtt_client.on_message = handle_mqtt_cmd
-        mqtt.loop_start()
+        mqtt_client.loop_start()
     
     init()
     loop()
