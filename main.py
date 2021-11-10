@@ -9,10 +9,13 @@ import io
 import queue
 import traceback
 import paho.mqtt.client as mqtt
+import cherrypy
+import os
 from datetime import datetime
 
 import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
 
 mqtt_client = mqtt.Client()
 db_filename = None
@@ -155,6 +158,44 @@ class OpenerThread(threading.Thread):
 
 opener = OpenerThread(name="Opener")
 
+class WebGatekeeper(threading.Thread):
+    def __init__(self):
+        super().__init__(name='WebGatekeeper')
+        self.daemon = True
+
+    @cherrypy.expose
+    def index(self):
+        return '<meta http-equiv="refresh" content="0;URL=\'/static/index.html\'" />'
+
+    @cherrypy.expose
+    def open_sesame(self):
+        logger.info('Opening gate from MQTT command')
+        mqtt_client.publish("hsg/gatekeeper/open", "web")
+        opener.semaphore.release()
+        return '<meta http-equiv="refresh" content="0;URL=\'/static/opened.html\'" />'
+
+    def run(self):
+        conf = {
+            '/': {
+                'tools.sessions.on': True,
+                'tools.staticdir.root': os.path.abspath(os.getcwd())
+            },
+            '/static': {
+                'tools.staticdir.on': True,
+                'tools.staticdir.dir': './static'
+            }
+        }
+        logger.info('Starting WebGatekeeper frontend')
+        cherrypy.config.update(
+            {
+                'server.socket_host': '0.0.0.0',
+            }
+        )
+        cherrypy.quickstart(self, '/', conf)
+
+
+    
+
 def init():
     global cached_db
     cached_db = load_database()
@@ -285,7 +326,7 @@ def loop():
 
 def handle_ring(number):
     global cached_db
-    #mqtt.publish("gatekeeper/ring", number)
+    mqtt_client.publish("hsg/gatekeeper/ring", 1)
     logger.info("Received call from %s", number)
     try:
         number = number.decode("ascii")
@@ -312,11 +353,23 @@ def handle_ring(number):
                 label = filt.label()
     if accept:
         # Open door
-        #mqtt.publish("gatekeeper/open", label or "anon")
-        mqtt
+        mqtt_client.publish("hsg/gatekeeper/open", label or "anon")
         logger.info("Door opened for: %s", label)
         opener.semaphore.release()
-        # TODO: Publish on MQTT
+
+
+def handle_mqtt_cmd(client, userdata, msg):
+    logger.info("Received MQTT command '%s' on topic '%s'", str(msg.payload), msg.topic)
+    
+    if msg.payload.decode('utf-8') == 'open':
+        logger.info('Opening gate from MQTT command')
+        mqtt_client.publish("hsg/gatekeeper/open", "mqtt")
+        opener.semaphore.release()
+
+
+def handle_mqtt_connect(client, userdata, flags, rc):
+    logger.info("Connected to MQTT server")
+    client.subscribe("hsg/gatekeeper/cmd")
         
     
     
@@ -374,16 +427,21 @@ def configure_log(use_journald, verbosity):
 @click.command()
 @click.option("--journald/--no-journald", default=False)
 @click.option("-v", '--verbose', count=True)
-@click.option("-d", "--database")
+@click.option("-d", "--database", required=True)
 @click.option("-m", "--mqtt")
-def main(journald, verbose, database, mqtt):
+@click.option('--web/--no-web', default=False)
+def main(journald, verbose, database, mqtt, web):
     global db_filename
     db_filename = database
     configure_log(journald, verbose)
     if mqtt:
         mqtt_client.connect(mqtt)
-        mqtt.loop_start()
-    
+        mqtt_client.on_connect = handle_mqtt_connect
+        mqtt_client.on_message = handle_mqtt_cmd
+        mqtt_client.loop_start()
+    if web:
+        WebGatekeeper().start()
+
     init()
     loop()
     

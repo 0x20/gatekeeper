@@ -1,0 +1,10 @@
+[Unit]
+Description=Service to open roll-up door upon phone calls
+
+[Service]
+User=pi
+Group=pi
+ExecStart=/usr/bin/python3 /home/pi/gatekeeper/main.py -d /home/pi/gatekeeper/whitelist -m mqtt --journald -v
+
+[Install]
+WantedBy=multi-user.target
