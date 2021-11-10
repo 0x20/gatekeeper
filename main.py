@@ -172,7 +172,7 @@ class WebGatekeeper(threading.Thread):
         logger.info('Opening gate from MQTT command')
         mqtt_client.publish("hsg/gatekeeper/open", "web")
         opener.semaphore.release()
-        return '<meta http-equiv="refresh" content="0;URL=\'/static/index.html\'" />'
+        return '<meta http-equiv="refresh" content="0;URL=\'/static/opened.html\'" />'
 
     def run(self):
         conf = {
