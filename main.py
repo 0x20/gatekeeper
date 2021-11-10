@@ -157,7 +157,7 @@ class OpenerThread(threading.Thread):
 
 opener = OpenerThread(name="Opener")
 
-class WebGatekeeper(threading.Thread):
+class WebGatekeeper(object):
     @cherrypy.expose
     def index(self):
         return 'hello'
@@ -169,8 +169,9 @@ class WebGatekeeper(threading.Thread):
         opener.semaphore.release()
         return 'ok'
 
+class WebGatekeeperThread(threading.Thread):
     def run(self):
-        cherrypy.quickstart(self)
+        cherrypy.quickstart(WebGatekeeper())
 
     
 
