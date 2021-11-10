@@ -285,7 +285,7 @@ def loop():
 
 def handle_ring(number):
     global cached_db
-    #mqtt.publish("gatekeeper/ring", number)
+    mqtt.publish("hsg/gatekeeper/ring", 1)
     logger.info("Received call from %s", number)
     try:
         number = number.decode("ascii")
@@ -312,11 +312,23 @@ def handle_ring(number):
                 label = filt.label()
     if accept:
         # Open door
-        #mqtt.publish("gatekeeper/open", label or "anon")
-        mqtt
+        mqtt.publish("hsg/gatekeeper/open", label or "anon")
         logger.info("Door opened for: %s", label)
         opener.semaphore.release()
         # TODO: Publish on MQTT
+
+
+def handle_mqtt_cmd(client, userdata, msg):
+    logger.info("Received MQTT command '%s' on topic '%s'", str(msg.payload), str(msg.topic))
+    if msg.topic == 'hsg/gatekeeper/cmd':
+        if lower(str(msg.payload)) == 'open':
+            logger.info('Opening gate from MQTT command')
+            opener.semaphore.release()
+
+
+def handle_mqtt_connect(client, userdata, flags, rc):
+    logger.info("Connected to MQTT server")
+    client.subscribe("hsg/gatekeeper/cmd")
         
     
     
@@ -382,6 +394,8 @@ def main(journald, verbose, database, mqtt):
     configure_log(journald, verbose)
     if mqtt:
         mqtt_client.connect(mqtt)
+        mqtt_client.on_connect = handle_mqtt_connect
+        mqtt_client.on_message = handle_mqtt_cmd
         mqtt.loop_start()
     
     init()
