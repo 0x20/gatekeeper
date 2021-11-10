@@ -13,6 +13,7 @@ from datetime import datetime
 
 import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
 
 mqtt_client = mqtt.Client()
 db_filename = None
