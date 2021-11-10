@@ -165,14 +165,14 @@ class WebGatekeeper(threading.Thread):
 
     @cherrypy.expose
     def index(self):
-        return 'hello'
+        return '<meta http-equiv="refresh" content="0;URL=\'/static/index.html\'" />'
 
     @cherrypy.expose
     def open_sesame(self):
         logger.info('Opening gate from MQTT command')
         mqtt_client.publish("hsg/gatekeeper/open", "web")
         opener.semaphore.release()
-        return 'ok'
+        return '<meta http-equiv="refresh" content="0;URL=\'/static/index.html\'" />'
 
     def run(self):
         conf = {
