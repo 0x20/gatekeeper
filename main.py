@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-from _typeshed import Self
 import serial
 import click
 import re
