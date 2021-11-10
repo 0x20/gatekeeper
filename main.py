@@ -342,7 +342,7 @@ def handle_ring(number):
     else:
         cached_db = db
 
-    # TODO: fill this in
+    
     now = datetime.now()
     accept = False
     label = None
@@ -351,6 +351,15 @@ def handle_ring(number):
             accept = True
             if label == None:
                 label = filt.label()
+
+    if now.weekday() == 3 and now.hour >= 18:
+        label = "unknown, open day"
+        accept = True
+
+    if os.path.exists('/tmp/eventmode'):
+        label = "unknown, event mode"
+        accept = True
+
     if accept:
         # Open door
         mqtt_client.publish("hsg/gatekeeper/open", label or "anon")

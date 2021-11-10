@@ -4,7 +4,7 @@ This application is responsible for opening and closing the front gate.
 
 ## Context
 
-Gatekeeper is a raspberry pi (hostname `zuul`) that is responsible for opening the front gate for guest and members. The pi is used to control the gate remote control and uses a Sim800 module to receive calls
+Gatekeeper is a raspberry pi (hostname `zuul`) that is responsible for opening the front gate for guest and members. The pi is used to control the gate remote control and uses a Sim800 module to receive calls.
 
 ## Usage
 
@@ -19,6 +19,19 @@ The application can be deployed using the included systemd service.
 To run the application without systemd, use the following command:
 
     python3 main.py -d ./whitelist -v --no-journald -m mqtt
+
+
+## Special operation modes
+
+Gatekeeper is aware of two special operation modes, event mode (i.e. for Newline or other events) and the Thursday social evening.
+
+### Thursday social
+
+The gate should open when any number calls.
+
+### Event mode
+
+Sometimes it's useful to be able to manually override the CID check; eg during newline or other events. Event mode is activated by creating the `/tmp/eventmode` file; eg using `touch /tmp/eventmode`. This path has been chosen since it doesn't persist. This way, someone unfamiliar with the system can just turn it off and on again to restore it back to the standard operational state. 
 
 ## MQTT
 
