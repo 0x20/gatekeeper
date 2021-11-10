@@ -170,7 +170,12 @@ class WebGatekeeper(object):
         return 'ok'
 
 class WebGatekeeperThread(threading.Thread):
+    def __init__(self):
+        super().__init__(name='WebGatekeeper')
+        self.daemon = True
+
     def run(self):
+        logger.info('Starting WebGatekeeper frontend')
         cherrypy.quickstart(WebGatekeeper())
 
     
@@ -419,7 +424,7 @@ def main(journald, verbose, database, mqtt, web):
         mqtt_client.on_message = handle_mqtt_cmd
         mqtt_client.loop_start()
     if web:
-        WebGatekeeper()
+        WebGatekeeper().start()
 
     init()
     loop()
