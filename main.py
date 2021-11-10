@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from _typeshed import Self
 import serial
 import click
 import re
@@ -9,6 +10,7 @@ import io
 import queue
 import traceback
 import paho.mqtt.client as mqtt
+import cherrypy
 from datetime import datetime
 
 import RPi.GPIO as GPIO
@@ -155,6 +157,23 @@ class OpenerThread(threading.Thread):
             GPIO.output(GPIO_OPEN, False)
 
 opener = OpenerThread(name="Opener")
+
+class WebGatekeeper(threading.Thread):
+    @cherrypy.expose
+    def index(self):
+        return 'hello'
+
+    @cherrypy.expose
+    def open_sesame(self):
+        logger.info('Opening gate from MQTT command')
+        mqtt_client.publish("hsg/gatekeeper/open", "web")
+        opener.semaphore.release()
+        return 'ok'
+
+    def run(self):
+        cherrypy.quickstart(Self)
+
+    
 
 def init():
     global cached_db
@@ -389,7 +408,8 @@ def configure_log(use_journald, verbosity):
 @click.option("-v", '--verbose', count=True)
 @click.option("-d", "--database", required=True)
 @click.option("-m", "--mqtt")
-def main(journald, verbose, database, mqtt):
+@click.option('--web/--no-web', default=False)
+def main(journald, verbose, database, mqtt, web):
     global db_filename
     db_filename = database
     configure_log(journald, verbose)
@@ -398,7 +418,9 @@ def main(journald, verbose, database, mqtt):
         mqtt_client.on_connect = handle_mqtt_connect
         mqtt_client.on_message = handle_mqtt_cmd
         mqtt_client.loop_start()
-    
+    if web:
+        WebGatekeeper()
+
     init()
     loop()
     
