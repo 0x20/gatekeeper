@@ -170,7 +170,7 @@ class WebGatekeeper(threading.Thread):
         return 'ok'
 
     def run(self):
-        cherrypy.quickstart(Self)
+        cherrypy.quickstart(self)
 
     
 
