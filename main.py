@@ -10,6 +10,7 @@ import queue
 import traceback
 import paho.mqtt.client as mqtt
 import cherrypy
+import os
 from datetime import datetime
 
 import RPi.GPIO as GPIO
@@ -157,7 +158,11 @@ class OpenerThread(threading.Thread):
 
 opener = OpenerThread(name="Opener")
 
-class WebGatekeeper(object):
+class WebGatekeeper(threading.Thread):
+    def __init__(self):
+        super().__init__(name='WebGatekeeper')
+        self.daemon = True
+
     @cherrypy.expose
     def index(self):
         return 'hello'
@@ -169,14 +174,25 @@ class WebGatekeeper(object):
         opener.semaphore.release()
         return 'ok'
 
-class WebGatekeeperThread(threading.Thread):
-    def __init__(self):
-        super().__init__(name='WebGatekeeper')
-        self.daemon = True
-
     def run(self):
+        conf = {
+            '/': {
+                'tools.sessions.on': True,
+                'tools.staticdir.root': os.path.abspath(os.getcwd())
+            },
+            '/static': {
+                'tools.staticdir.on': True,
+                'tools.staticdir.dir': './static'
+            }
+        }
         logger.info('Starting WebGatekeeper frontend')
-        cherrypy.quickstart(WebGatekeeper())
+        cherrypy.config.update(
+            {
+                'server.socket_host': '0.0.0.0',
+            }
+        )
+        cherrypy.quickstart(self, '/', conf)
+
 
     
 
@@ -424,7 +440,7 @@ def main(journald, verbose, database, mqtt, web):
         mqtt_client.on_message = handle_mqtt_cmd
         mqtt_client.loop_start()
     if web:
-        WebGatekeeperThread().start()
+        WebGatekeeper().start()
 
     init()
     loop()
