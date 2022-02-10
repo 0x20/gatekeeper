@@ -41,6 +41,8 @@ Gatekeeper listens to commands on the `hsg/gatekeeper/cmd` topic. So far it supp
 
 * `open`: open the gate
 * `eventmode?`: query event mode state, result will be published in the `hsg/gatekeeper/eventmode` topic.
+* `enable_eventmode`: enables event mode, result will be published in the `hsg/gatekeeper/eventmode` topic.
+* `disable_eventmode`: result will be published in the `hsg/gatekeeper/eventmode` topic.
 
 Gatekeeper will also publish events on the `hsg/gatekeeper/*` topics:
 
