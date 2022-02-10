@@ -406,6 +406,13 @@ def handle_mqtt_cmd(client, userdata, msg):
         mqtt_client.publish("hsg/gatekeeper/open", "mqtt")
         opener.semaphore.release()
 
+    if msg.payload.decode('utf-8') == 'eventmode?':
+        logger.info('Someone queried event mode state. Publishing.')
+        if os.path.exists('/tmp/eventmode'):
+            mqtt_client.publish("hsg/gatekeeper/eventmode", "1")
+        else:
+            mqtt_client.publish("hsg/gatekeeper/eventmode", "0")
+
 
 def handle_mqtt_connect(client, userdata, flags, rc):
     logger.info("Connected to MQTT server")

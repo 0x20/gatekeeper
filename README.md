@@ -40,10 +40,12 @@ Gatekeeper can also be monitored and controlled using MQTT.
 Gatekeeper listens to commands on the `hsg/gatekeeper/cmd` topic. So far it supports the following commands:
 
 * `open`: open the gate
+* `eventmode?`: query event mode state, result will be published in the `hsg/gatekeeper/eventmode` topic.
 
 Gatekeeper will also publish events on the `hsg/gatekeeper/*` topics:
 
 * `hsg/gatekeeper/open`: this topic will have a message published with the owner as described in the data file upon a successful call to open the gate.
 * `hsg/gatekeeper/ring`: this topic will have a message published when the phone number of the Gatekeeper device is rang. This does not signal a successful authentication. The contents of the messages in this topic should be discarded.
+* `hsg/gatekeeper/eventmode`: this topic will disclose if event mode is enabled or not. When a 1 is published, event mode is enabled. 0 means disabled.
 
 
