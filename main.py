@@ -11,6 +11,7 @@ import traceback
 import paho.mqtt.client as mqtt
 import cherrypy
 import os
+from pathlib import Path
 from datetime import datetime
 
 import RPi.GPIO as GPIO
@@ -405,6 +406,33 @@ def handle_mqtt_cmd(client, userdata, msg):
         logger.info('Opening gate from MQTT command')
         mqtt_client.publish("hsg/gatekeeper/open", "mqtt")
         opener.semaphore.release()
+
+    if msg.payload.decode('utf-8') == 'eventmode?':
+        logger.info('Someone queried event mode state. Publishing.')
+        if os.path.exists('/tmp/eventmode'):
+            mqtt_client.publish("hsg/gatekeeper/eventmode", "1")
+        else:
+            mqtt_client.publish("hsg/gatekeeper/eventmode", "0")
+
+    if msg.payload.decode('utf-8') == 'enable_eventmode':
+        logger.info('Enabling event mode')
+        Path('/tmp/eventmode').touch()
+        if os.path.exists('/tmp/eventmode'):
+            mqtt_client.publish("hsg/gatekeeper/eventmode", "1")
+        else:
+            mqtt_client.publish("hsg/gatekeeper/eventmode", "0")
+
+    if msg.payload.decode('utf-8') == 'disable_eventmode':
+        logger.info('Disabling event mode')
+        try:
+            os.remove('/tmp/eventmode')
+        except:
+            logger.info('Failed to disable event mode - already disabled?')
+
+        if os.path.exists('/tmp/eventmode'):
+            mqtt_client.publish("hsg/gatekeeper/eventmode", "1")
+        else:
+            mqtt_client.publish("hsg/gatekeeper/eventmode", "0")
 
 
 def handle_mqtt_connect(client, userdata, flags, rc):
