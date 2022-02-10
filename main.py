@@ -368,11 +368,6 @@ def handle_ring(number):
     now = datetime.now()
     accept = False
     label = None
-    for filt in db:
-        if filt.match(now, number):
-            accept = True
-            if label == None:
-                label = filt.label()
 
     if now.weekday() == 3 and now.hour >= 18:
         label = "unknown, open day"
@@ -381,6 +376,12 @@ def handle_ring(number):
     if os.path.exists('/tmp/eventmode'):
         label = "unknown, event mode"
         accept = True
+
+    for filt in db:
+        if filt.match(now, number):
+            accept = True
+            if label == None or "unknown" in label:
+                label = filt.label()
 
     if accept:
         # Open door
