@@ -29,6 +29,9 @@ GPIO_OPEN = 27
 GPIO_GSM_PWR = 17
 GPIO_GSM_RST = 18
 
+# MQTT host
+MQTT_HOST = ""
+
 event_queue = queue.SimpleQueue()
 
 class Filter:
@@ -170,7 +173,16 @@ class WebGatekeeper(threading.Thread):
     @cherrypy.expose
     def open_sesame(self):
         logger.info('Opening gate from MQTT command')
-        mqtt_client.publish("hsg/gatekeeper/open", "web")
+        if mqtt_client.is_connected():
+            mqtt_client.publish("hsg/gatekeeper/open", "web")
+        else:
+            logger.warning("Could not publish to MQTT. Attempting to reconnect...")
+            try:
+                mqtt_client.connect(MQTT_HOST)
+                mqtt_client.publish("hsg/gatekeeper/open", "web")
+            except:
+                logger.error("Could not connect to MQTT.")
+
         opener.semaphore.release()
         return '<meta http-equiv="refresh" content="0;URL=\'/static/opened.html\'" />'
 
@@ -326,7 +338,17 @@ def loop():
 
 def handle_ring(number):
     global cached_db
-    mqtt_client.publish("hsg/gatekeeper/ring", 1)
+
+    if mqtt_client.is_connected():
+        mqtt_client.publish("hsg/gatekeeper/ring", 1)
+    else:
+        logger.warning("Could not publish to MQTT. Attempting to reconnect...")
+        try:
+            mqtt_client.connect(MQTT_HOST)
+            mqtt_client.publish("hsg/gatekeeper/ring", 1)
+        except:
+            logger.error("Could not connect to MQTT.")
+
     logger.info("Received call from %s", number)
     try:
         number = number.decode("ascii")
@@ -362,7 +384,15 @@ def handle_ring(number):
 
     if accept:
         # Open door
-        mqtt_client.publish("hsg/gatekeeper/open", label or "anon")
+        if mqtt_client.is_connected():
+            mqtt_client.publish("hsg/gatekeeper/open", label or "anon")
+        else:
+            logger.warning("Could not publish to MQTT. Attempting to reconnect...")
+            try:
+                mqtt_client.connect(MQTT_HOST)
+                mqtt_client.publish("hsg/gatekeeper/open", label or "anon")
+            except:
+                logger.error("Could not connect to MQTT.")
         logger.info("Door opened for: %s", label)
         opener.semaphore.release()
 
@@ -440,11 +470,15 @@ def configure_log(use_journald, verbosity):
 @click.option("-m", "--mqtt")
 @click.option('--web/--no-web', default=False)
 def main(journald, verbose, database, mqtt, web):
-    global db_filename
+    global db_filename, MQTT_HOST
     db_filename = database
     configure_log(journald, verbose)
     if mqtt:
-        mqtt_client.connect(mqtt)
+        MQTT_HOST = mqtt
+        try:
+            mqtt_client.connect(mqtt)
+        except Exception:
+            logger.error("Failed to connect to MQTT - will try again later.")
         mqtt_client.on_connect = handle_mqtt_connect
         mqtt_client.on_message = handle_mqtt_cmd
         mqtt_client.loop_start()
